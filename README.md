@@ -1,3 +1,5 @@
+**CSFS (Chris' Simple File System)**
+
 Very simple P2P Decentralized glorified copy-and-paste that happens to work across computers, and only for files.
 
 When files are uploaded to the tracked folder, the system automatically sends them to all clients connected to the session.
