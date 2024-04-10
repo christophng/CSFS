@@ -210,7 +210,8 @@ class Node:
                 # Construct message
                 message = {"type": topic, **kwargs}
                 # Send message to each node
-                self.communication.send_message(node_ip, SOCKET_LISTENING_PORT, message)
+                # Node_ip is a tuple with (IP, port)
+                self.communication.send_message(node_ip[0], SOCKET_LISTENING_PORT, message)
 
     def store_file(self, file_name, file_data):
         # Implement file storage functionality
