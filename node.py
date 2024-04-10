@@ -3,6 +3,7 @@ import inspect
 import logging
 import os
 import threading
+import traceback
 
 from kademlia.network import Server
 
@@ -333,7 +334,8 @@ class Node:
         file_path = os.path.join(TRACKED_FOLDER_PATH, file_name)
 
         try:
-            await self.communication.send_file(dest_ip, file_path)
+            self.communication.send_file(dest_ip, file_path)
             print(f"File '{file_name}' sent successfully from {file_owner}")
         except Exception as e:
             print(f"Failed to download file '{file_name}' from {file_owner}: {e}")
+            traceback.print_exc()
