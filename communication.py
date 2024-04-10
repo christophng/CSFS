@@ -1,7 +1,7 @@
 import socket
 import pickle
 
-from globals import LISTENING_PORT
+from globals import SOCKET_LISTENING_PORT
 
 
 class Communication:
@@ -9,9 +9,15 @@ class Communication:
         pass
 
     def send_message(self, ip, port, message):
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.connect((ip, port))
-            s.send(pickle.dumps(message))
+
+        sender_ip = self.get_local_ipv4()
+        if sender_ip:
+            message["sender_address"] = (sender_ip, SOCKET_LISTENING_PORT)
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.connect((ip, port))
+                s.send(pickle.dumps(message))
+        else:
+            print("Socket send message failed. Local IPv4 not found.")
 
     def receive_message(self, port):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -33,8 +39,7 @@ class Communication:
         :return:
         """
 
-        sender_ip = socket.gethostbyname(socket.gethostname())
-        message = {"type": "join_request", "session_id": session_id, "address": (sender_ip, LISTENING_PORT)}
+        message = {"type": "join_request", "session_id": session_id}
         print(f"Sending join request message to ({ip, port}): {message} ...")
         self.send_message(ip, port, message)
 
@@ -52,3 +57,12 @@ class Communication:
         message = {"type": "join_request_response", "verified": verified}
         print(f"Sending response to join request to ({ip, port}): {message}")
         self.send_message(ip, port, message)
+
+    def get_local_ipv4(self):
+        try:
+            # Get the IPv4 address associated with the local machine
+            ip = socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET)[0][-1][0]
+            return ip
+        except Exception as e:
+            print("Error getting local IPv4 address:", e)
+            return None

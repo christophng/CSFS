@@ -1,16 +1,17 @@
 import asyncio
+import inspect
 import threading
 
 from kademlia.network import Server
 
 from communication import Communication
-from globals import LISTENING_PORT
+from globals import LISTENING_PORT, SOCKET_LISTENING_PORT
 
 
 async def init_server():
     try:
         server = Server()
-        await server.listen(LISTENING_PORT)  # Listen on port 8468 for incoming connections
+        await server.listen(LISTENING_PORT)  # Listen on port 8468 for incoming connections, this is the Kademlia server
         # When initializing, we don't need to bootstrap yet (in case creating a session)
         # await server.bootstrap([("127.0.0.1", 8468)])  # Bootstrap to itself initially
         print(f"Kademlia server listening on port: {LISTENING_PORT}")
@@ -30,7 +31,8 @@ class Node:
         # Communication stuff
         self.communication = Communication()
         self.message_handlers = {
-            "join_request": self.handle_verification_message
+            "join_request": self.handle_verification_message,
+            "join_request_response": self.handle_verification_response_message,
         }
         self.running = True
 
@@ -50,15 +52,19 @@ class Node:
         print("Kademlia server successfully initialized!")
 
     async def listen_for_messages(self):
-        print(f"Socket listening for messages on port {LISTENING_PORT}...")
+        print(f"Socket listening for messages on port {SOCKET_LISTENING_PORT}...")
         while self.running:
-            message = self.communication.receive_message(LISTENING_PORT)
+            message = self.communication.receive_message(SOCKET_LISTENING_PORT)
             if message:
                 print(f"Received socket message: {message}")
                 message_type = message.get("type")
                 handler = self.message_handlers.get(message_type)
                 if handler:
-                    self.message_handlers[message_type](message)
+                    if inspect.iscoroutinefunction(handler):
+                        print("Found coroutine handler")
+                        await self.message_handlers[message_type](message)
+                    else:
+                        self.message_handlers[message_type](message)
                 else:
                     print(f"No handler found for message type '{message_type}'.")
 
@@ -70,23 +76,33 @@ class Node:
             self.session_id = session_id
 
             # Send verification request msg first
-            self.communication.send_join_request_message(bootstrap_node[0], bootstrap_node[1], session_id)
+            self.communication.send_join_request_message(bootstrap_node[0], SOCKET_LISTENING_PORT, session_id)
             # Get verification request response
-            response = self.communication.receive_verification_response(LISTENING_PORT)
-            if response and response.get("verified"):
-                print(f"Performing bootstrapping for node {bootstrap_node}")
-                await self.server.bootstrap([bootstrap_node])
-                print(f"Bootstrapping successful.")
-            else:
-                print("Session ID verification failed.")
+            # response = self.communication.receive_verification_response(LISTENING_PORT)
+            # if response and response.get("verified"):
+            #     print(f"Performing bootstrapping for node {bootstrap_node}")
+            #     await self.server.bootstrap([bootstrap_node])
+            #     print(f"Bootstrapping successful.")
+            # else:
+            #     print("Session ID verification failed.")
 
         except Exception as e:
             print("Error joining session:", e)
             raise
 
+    async def handle_verification_response_message(self, message):
+        if message and message.get("verified"):
+            sender_ip = message.get("sender_address")[0]
+            verified = message.get("verified")
+            if verified:
+                bootstrap_node = (sender_ip, LISTENING_PORT)
+                await self.server.bootstrap([bootstrap_node])
+            else:
+                print("Session ID verification failed.")
+
     def handle_verification_message(self, message):
         session_id = message.get("session_id")
-        address = message.get("address")
+        address = message.get("sender_address")
         if session_id == self.session_id:
             self.communication.send_verification_response(address[0], address[1], True)
         else:
