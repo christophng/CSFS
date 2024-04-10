@@ -259,7 +259,7 @@ class Node:
         file_metadata = message.get("file_metadata")
         address = message.get("sender_address")
         logging.debug(f"Sending file {file_metadata['file_name']} to {address[0]} now...")
-        await self.download_file(address[0], file_metadata)
+        await self.download_file(file_metadata, address[0])
 
     async def broadcast_file_addition(self, file_metadata):
         """
