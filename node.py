@@ -177,11 +177,11 @@ class Node:
 
         # Logic will transfer over to handle_broadcast_new_user
 
-    def handle_broadcast_new_user(self, message):
+    async def handle_broadcast_new_user(self, message):
         node_ip = message.get("node_ip")
         node_id = message.get("node_id")
         print(f"Got broadcast new node: adding new node: {node_id},{node_ip}")
-        self.session.add_session_node(node_id, node_ip)
+        await self.session.add_session_node(node_id, node_ip)
 
     def handle_verification_message(self, message):
         session_id = message.get("session_id")
