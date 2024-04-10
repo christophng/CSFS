@@ -165,9 +165,11 @@ class Node:
 
         # Insert data into own DHT
         for data_id, data_ip in data.items():
+            print(f"Attempting to add {data_id}:{data_ip} to session")
             await self.session.add_session_node(data_id, data_ip)
 
         # Now we want to add the bootstrapped node to our DHT
+        print(f"Attempting to add bootstrapped node {node_id}:{(address, SOCKET_LISTENING_PORT)} to session")
         await self.session.add_session_node(node_id, (address, SOCKET_LISTENING_PORT))
 
         # Now broadcast the join to all connected clients
