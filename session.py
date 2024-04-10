@@ -1,7 +1,11 @@
+import logging
 import pickle
 import uuid
 
 from kademlia.network import Server
+
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger("session")
 
 class Session:
     def __init__(self, server: Server):
@@ -12,9 +16,9 @@ class Session:
     async def add_session_node(self, node_id, node_ip):
         # Add a node to the session nodes in the DHT
         self.nodes[node_id] = node_ip
-        print(f"Adding node to session: {node_id}, {node_ip}")
+        logger.debug(f"Adding node to session: {node_id}, {node_ip}")
         await self.store_session_nodes()
-        print(f"Nodes now stored: {self.nodes}")
+        logger.debug(f"Nodes now stored: {self.nodes}")
 
     async def remove_session_node(self, node_id):
         # Remove a node from the session nodes in the DHT
@@ -27,7 +31,7 @@ class Session:
         key = f"session_nodes:{self.session_id}"
         value = self.nodes
         await self.server.set(key.encode(), pickle.dumps(value))
-        print(f"Nodes now stored: {self.nodes}")
+        logger.debug(f"Nodes now stored: {self.nodes}")
 
     def generate_session_id(self):
         self.session_id = str(uuid.uuid4())
@@ -48,4 +52,4 @@ class Session:
         value_bytes = await self.server.get(key.encode())
         if value_bytes:
             self.nodes = pickle.loads(value_bytes)
-        print(f"Updated session nodes. New local session data: {self.nodes}")
+        logger.debug(f"Updated session nodes. New local session data: {self.nodes}")

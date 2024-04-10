@@ -1,8 +1,11 @@
+import logging
 import socket
 import pickle
 
 from globals import SOCKET_LISTENING_PORT
 
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger("communication")
 
 class Communication:
     def __init__(self):
@@ -17,7 +20,7 @@ class Communication:
                 s.connect((ip, port))
                 s.send(pickle.dumps(message))
         else:
-            print("Socket send message failed. Local IPv4 not found.")
+            logger.debug("Socket send message failed. Local IPv4 not found.")
 
     def receive_message(self, port):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -27,7 +30,7 @@ class Communication:
             with conn:
                 data = conn.recv(1024)
                 message = pickle.loads(data)
-                print(f"Checked for socket message on port {port} and got: {message}")
+                logger.debug(f"Checked for socket message on port {port} and got: {message}")
                 return message
 
     def send_join_request_message(self, ip, port, session_id):
@@ -40,7 +43,7 @@ class Communication:
         """
 
         message = {"type": "join_request", "session_id": session_id}
-        print(f"Sending join request message to ({ip, port}): {message} ...")
+        logger.debug(f"Sending join request message to ({ip, port}): {message} ...")
         self.send_message(ip, port, message)
 
     def receive_verification_response(self, port):
@@ -55,21 +58,21 @@ class Communication:
         :return:
         """
         message = {"type": "join_request_response", "verified": verified}
-        print(f"Sending response to join request to ({ip, port}): {message}")
+        logger.debug(f"Sending response to join request to ({ip, port}): {message}")
         self.send_message(ip, port, message)
 
     def send_replicate_dht_request(self, bootstrapped_node_ip):
         # Send a request to the bootstrapped node to retrieve its DHT data
 
         message = {"type": "replicate_dht_bootstrap"}
-        print(f"Sending Replicate-DHT request to ({bootstrapped_node_ip, SOCKET_LISTENING_PORT}: {message})")
+        logger.debug(f"Sending Replicate-DHT request to ({bootstrapped_node_ip, SOCKET_LISTENING_PORT}: {message})")
         self.send_message(bootstrapped_node_ip, SOCKET_LISTENING_PORT, message)
 
     def send_replicate_dht_request_response(self, dest_ip, data, node_id):
         # Send a response to the replicate dht request with the bootstrapped node's DHT data
 
         message = {"type": "replicate_dht_bootstrap_response", "node_id": node_id, "data": data}
-        print(f"Sending Replicate-DHT request to ({dest_ip, SOCKET_LISTENING_PORT}: {message})")
+        logger.debug(f"Sending Replicate-DHT request to ({dest_ip, SOCKET_LISTENING_PORT}: {message})")
         self.send_message(dest_ip, SOCKET_LISTENING_PORT, message)
 
     def send_broadcast_ack(self, dest_ip, node_id):
@@ -80,7 +83,7 @@ class Communication:
         :return:
         """
         message = {"type": "broadcast_ack", "node_id": node_id}
-        print(f"Sending broadcast ack to ({dest_ip, SOCKET_LISTENING_PORT}: {message})")
+        logger.debug(f"Sending broadcast ack to ({dest_ip, SOCKET_LISTENING_PORT}: {message})")
         self.send_message(dest_ip, SOCKET_LISTENING_PORT, message)
 
     def get_local_ipv4(self):
@@ -89,5 +92,5 @@ class Communication:
             ip = socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET)[0][-1][0]
             return ip
         except Exception as e:
-            print("Error getting local IPv4 address:", e)
+            logger.debug("Error getting local IPv4 address:", e)
             return None

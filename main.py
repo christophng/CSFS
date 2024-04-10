@@ -10,7 +10,7 @@ async def main():
     await node.initialize()
 
     while True:
-        command = await aioconsole.ainput("Enter command (create/join/exit): ")
+        command = await aioconsole.ainput("Enter command (create/join/exit): \n\n")
 
         if command == "create":
             if node.session.session_id is not None:

@@ -9,8 +9,11 @@ from communication import Communication
 from globals import LISTENING_PORT, SOCKET_LISTENING_PORT, ACK_WAIT_TIMEOUT
 from session import Session
 
-logging.getLogger("kademlia").setLevel(logging.DEBUG)
+# Configure logging
 logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger("node")
+# logging.getLogger("kademlia").setLevel(logging.DEBUG)
+
 
 
 def bytes_to_hex_string(byte_string):
@@ -23,16 +26,16 @@ async def init_server():
         await server.listen(LISTENING_PORT)  # Listen on port 8468 for incoming connections, this is the Kademlia server
         # When initializing, we don't need to bootstrap yet (in case creating a session)
         # await server.bootstrap([("127.0.0.1", 8468)])  # Bootstrap to itself initially
-        print(f"Kademlia server listening on port: {LISTENING_PORT}")
+        logger.debug(f"Kademlia server listening on port: {LISTENING_PORT}")
         return server
     except Exception as e:
-        print("Error initializing server:", e)
+        logger.debug("Error initializing server:", e)
         raise
 
 
 class Node:
     def __init__(self):
-        print("Node initializing...")
+        logger.debug("Node initializing...")
         self.node_id = None
         self.server = None
         self.session = None
@@ -66,36 +69,36 @@ class Node:
 
     async def initialize(self):
         self.server = await init_server()
-        print("Kademlia server successfully initialized!")
+        logger.debug("Kademlia server successfully initialized!")
         self.session = Session(self.server)  # Initialize session after server
         # Since session needs server in its constructor
         self.node_id = bytes_to_hex_string(self.server.node.id)
-        print(f"Assigned node ID: {self.node_id}")
+        logger.debug(f"Assigned node ID: {self.node_id}")
 
     async def bootstrap(self, bootstrap_node):
         await self.server.bootstrap([bootstrap_node])
 
     async def listen_for_messages(self):
-        print(f"Socket listening for messages on port {SOCKET_LISTENING_PORT}...")
+        logger.debug(f"Socket listening for messages on port {SOCKET_LISTENING_PORT}...")
         while self.running:
             message = self.communication.receive_message(SOCKET_LISTENING_PORT)
             if message:
-                print(f"Received socket message: {message}")
+                logger.debug(f"Received socket message: {message}")
                 message_type = message.get("type")
                 handler = self.message_handlers.get(message_type)
                 if handler:
                     if inspect.iscoroutinefunction(handler):
-                        print("Found coroutine handler")
+                        logger.debug("Found coroutine handler")
                         await self.message_handlers[message_type](message)
                     else:
                         self.message_handlers[message_type](message)
                 else:
-                    print(f"No handler found for message type '{message_type}'.")
+                    logger.debug(f"No handler found for message type '{message_type}'.")
 
     async def join_session(self, session_id, bootstrap_node):
         try:
 
-            print(f"Trying to join session {session_id} via bootstrap node {bootstrap_node}...")
+            logger.debug(f"Trying to join session {session_id} via bootstrap node {bootstrap_node}...")
 
             self.provided_session_id = session_id
 
@@ -104,7 +107,7 @@ class Node:
             # The response will be intercepted by the listener, and will be handled
 
         except Exception as e:
-            print("Error joining session:", e)
+            logger.debug("Error joining session:", e)
             raise
 
     async def handle_verification_response_message(self, message):
@@ -123,10 +126,10 @@ class Node:
             verified = message.get("verified")
             if verified:
                 bootstrap_node = (sender_ip, LISTENING_PORT)
-                print(f"Sending bootstrap request to {bootstrap_node}")
+                logger.debug(f"Sending bootstrap request to {bootstrap_node}")
                 await self.bootstrap(bootstrap_node)
                 self.session.set_session_id(self.provided_session_id)
-                print(f"Joined session: {self.session.get_session_id()}")
+                logger.debug(f"Joined session: {self.session.get_session_id()}")
 
                 # Do rest of join session logic on the node who's joining's side
                 # REPLICATE DHT
@@ -135,7 +138,7 @@ class Node:
                 # Logic will transfer over to handle_replicate_dht_request
 
             else:
-                print("Session ID verification failed. The Session ID could be incorrect or the node you are "
+                logger.debug("Session ID verification failed. The Session ID could be incorrect or the node you are "
                       "attempting to contact is not connected to a session.")
 
     async def handle_replicate_dht_request(self, message):
@@ -146,11 +149,11 @@ class Node:
         """
         address = message.get("sender_address")[0]
 
-        print(f"Local session data before update session: {self.session.nodes}")
+        logger.debug(f"Local session data before update session: {self.session.nodes}")
         await self.session.update_session_nodes()  # Load DHT data to local session data
         data = self.session.nodes
         node_id = self.node_id
-        print(f"Local data from bootstrapped node after update session: {data}")
+        logger.debug(f"Local data from bootstrapped node after update session: {data}")
         self.communication.send_replicate_dht_request_response(address, data, node_id)
         # Logic will transfer over to handle_replicate_dht_request_response
 
@@ -166,15 +169,15 @@ class Node:
         data = message.get("data")  # Bootstrap node DHT data
         address = message.get("sender_address")[0]  # Address of sender (bootstrap node)
         node_id = message.get("node_id")  # Node id of bootstrap node
-        print(f"Got DHT request response: {data}")
+        logger.debug(f"Got DHT request response: {data}")
 
         # Insert data into own DHT
         for data_id, data_ip in data.items():
-            print(f"Attempting to add {data_id}:{data_ip} to session")
+            logger.debug(f"Attempting to add {data_id}:{data_ip} to session")
             await self.session.add_session_node(data_id, data_ip)
 
         # Now we want to add the bootstrapped node to our DHT
-        print(f"Attempting to add bootstrapped node {node_id}:{(address, SOCKET_LISTENING_PORT)} to session")
+        logger.debug(f"Attempting to add bootstrapped node {node_id}:{(address, SOCKET_LISTENING_PORT)} to session")
         await self.session.add_session_node(node_id, (address, SOCKET_LISTENING_PORT))
 
         # Now broadcast the join to all connected clients
@@ -188,14 +191,14 @@ class Node:
         node_ip = message.get("node_ip")
         node_id = message.get("node_id")
         sender_address = message.get("sender_address")
-        print(f"Got broadcast new node: adding new node: {node_id},{node_ip}")
+        logger.debug(f"Got broadcast new node: adding new node: {node_id},{node_ip}")
         await self.session.add_session_node(node_id, node_ip)
         self.communication.send_broadcast_ack(sender_address[0], self.node_id)
 
     def handle_verification_message(self, message):
         session_id = message.get("session_id")
         address = message.get("sender_address")
-        print(f"Actual session ID: {self.session.get_session_id()}, Provided session ID: {session_id}")
+        logger.debug(f"Actual session ID: {self.session.get_session_id()}, Provided session ID: {session_id}")
         if session_id == self.session.get_session_id():
             self.communication.send_verification_response(address[0], address[1], True)
         else:
@@ -231,32 +234,32 @@ class Node:
 
             # We pause broadcast for ACK_WAIT_TIMEOUT seconds. When the sleep is over, all nodes that haven't had
             # their ACK been processed/handled yet are considered offline
-            print("Starting broadcast wait...")
+            logger.debug("Starting broadcast wait...")
             await asyncio.sleep(ACK_WAIT_TIMEOUT)
 
             # After sleep is over, lets check self.active_nodes to see which nodeIDs still have a False value
-            for node_id, is_acked in self.active_nodes.values():
-                print(f"Checking if acks are received. ID: {node_id} Acked: {is_acked}")
+            for node_id, is_acked in self.active_nodes.items():
+                logger.debug(f"Checking if acks are received. ID: {node_id} Acked: {is_acked}")
                 if not is_acked:
-                    print(f"Found offline node {node_id}. Removing...")
+                    logger.debug(f"Found offline node {node_id}. Removing...")
                     self.session.remove_session_node(node_id)
 
             # Reset active_nodes
             self.active_nodes = {}
 
         except Exception as e:
-            print(f"Error during broadcast and handling inactive nodes: {e}")
+            logger.debug(f"Error during broadcast and handling inactive nodes: {e}")
 
     async def handle_broadcast_acks(self, message):
         # Here we handle acknowledgements from each client we sent the broadcast to successfully
         # Message should have nodeID (thats pretty much all we need to verify the ack)
         node_id = message.get("node_id")
-        print(f"Received an ack from {node_id}")
+        logger.debug(f"Received an ack from {node_id}")
         if node_id in self.active_nodes.keys():
             self.active_nodes[node_id] = True
         else:
-            print("Received an ack from node that we didn't broadcast to. Ignoring...")
-        print(f"Current status of active nodes: {self.active_nodes}")
+            logger.debug("Received an ack from node that we didn't broadcast to. Ignoring...")
+        logger.debug(f"Current status of active nodes: {self.active_nodes}")
 
     def store_file(self, file_name, file_data):
         # Implement file storage functionality
