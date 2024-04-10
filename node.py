@@ -1,5 +1,6 @@
 import asyncio
 import inspect
+import logging
 import threading
 
 from kademlia.network import Server
@@ -7,6 +8,9 @@ from kademlia.network import Server
 from communication import Communication
 from globals import LISTENING_PORT, SOCKET_LISTENING_PORT
 from session import Session
+
+logging.getLogger("kademlia").setLevel(logging.DEBUG)
+logging.basicConfig(level=logging.DEBUG)
 
 
 async def init_server():
@@ -54,6 +58,9 @@ class Node:
         self.server = await init_server()
         print("Kademlia server successfully initialized!")
 
+    async def bootstrap(self, bootstrap_node):
+        self.server.bootstrap([bootstrap_node])
+
     async def listen_for_messages(self):
         print(f"Socket listening for messages on port {SOCKET_LISTENING_PORT}...")
         while self.running:
@@ -100,7 +107,7 @@ class Node:
             if verified:
                 bootstrap_node = (sender_ip, LISTENING_PORT)
                 print(f"Sending bootstrap request to {bootstrap_node}")
-                await self.server.bootstrap([bootstrap_node])
+                await self.bootstrap([bootstrap_node])
                 self.session.set_session_id(self.provided_session_id)
                 print(f"Joined session: {self.session.get_session_id()}")
 
