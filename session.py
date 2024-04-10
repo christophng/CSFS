@@ -26,6 +26,7 @@ class Session:
         key = f"session_nodes:{self.session_id}"
         value = self.nodes
         await self.server.set(key.encode(), pickle.dumps(value))
+        print(f"Nodes now stored: {self.nodes}")
 
     def generate_session_id(self):
         self.session_id = str(uuid.uuid4())
