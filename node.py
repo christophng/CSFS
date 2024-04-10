@@ -1,12 +1,14 @@
 import asyncio
 import inspect
 import logging
+import os
 import threading
 
 from kademlia.network import Server
 
 from communication import Communication
-from globals import LISTENING_PORT, SOCKET_LISTENING_PORT, ACK_WAIT_TIMEOUT
+from filesharing import FileSharing, FileWatcher
+from globals import LISTENING_PORT, SOCKET_LISTENING_PORT, ACK_WAIT_TIMEOUT, TRACKED_FOLDER_PATH, FILE_TRANSFER_PORT
 from session import Session
 
 # Configure logging
@@ -52,6 +54,7 @@ class Node:
             "replicate_dht_bootstrap_response": self.handle_replicate_dht_request_response,
             "new_user_notificataion": self.handle_broadcast_new_user,
             "broadcast_ack": self.handle_broadcast_acks,
+            "file_addition": self.handle_file_addition_message,
         }
         self.running = True
 
@@ -59,12 +62,26 @@ class Node:
         self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
 
+        self.fs_loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self.fs_loop)
+
         # Listener thread
         self.listen_thread = threading.Thread(target=self.run_event_loop)
         self.listen_thread.start()
 
+        # File sharing thread
+        self.file_sharing_thread = threading.Thread(target=self.run_fs_event_loop)
+        self.file_sharing_thread.start()
+
+        # File sharing stuff
+        self.file_sharing = FileSharing(self)
+        self.file_watcher = None
+
     def run_event_loop(self):
         self.loop.run_until_complete(self.listen_for_messages())
+
+    def run_fs_event_loop(self):
+        self.fs_loop.run_until_complete(self.listen_for_file_sharing())
 
     async def initialize(self):
         self.server = await init_server()
@@ -73,9 +90,21 @@ class Node:
         # Since session needs server in its constructor
         self.node_id = bytes_to_hex_string(self.server.node.id)
         logger.debug(f"Assigned node ID: {self.node_id}")
+        # File watching
+        logger.debug(f"Initializing filewatcher")
+        self.file_watcher = FileWatcher(self.file_sharing)
+        await self.file_watcher.start()
 
     async def bootstrap(self, bootstrap_node):
         await self.server.bootstrap([bootstrap_node])
+
+    async def listen_for_file_sharing(self):
+        logger.debug(f"Socket listening for filesharing on port {FILE_TRANSFER_PORT}")
+        while self.running:
+            try:
+                self.communication.receive_file()
+            except Exception as e:
+                print(f"Error receiving file: {e}")
 
     async def listen_for_messages(self):
         logger.debug(f"Socket listening for messages on port {SOCKET_LISTENING_PORT}...")
@@ -203,9 +232,45 @@ class Node:
         else:
             self.communication.send_verification_response(address[0], address[1], False)
 
+    async def handle_file_addition_message(self, message):
+        """
+        Handles the file addition message received from the broadcasting client.
+        Updates the Kademlia DHT with the metadata of the added file.
+        Initiates automatic file download.
+        """
+        file_metadata = message.get("file_metadata")
+        address = message.get("sender_address")
+        # Update Kademlia DHT with the file metadata
+        await self.file_sharing.update_kademlia_dht(file_metadata)
+        # Initiate automatic file download
+        # First, we send an ACK back to the broadcasting client
+        # Once the client receives the ACK, it will start sending the file data over the file sharing socket
+        # await self.download_file(file_metadata)
+        self.communication.send_file_download_ack(address[0], file_metadata)
+
+    async def handle_file_addition_ack(self, message):
+        """
+        Handles the acknowledgement as a response to our new file broadcast
+        We want to start sending the files here
+        :param message:
+        :return:
+        """
+        file_metadata = message.get("file_metadata")
+        address = message.get("sender_address")
+        logging.debug(f"Sending file {file_metadata['file_name']} to {address[0]} now...")
+        await self.download_file(address[0], file_metadata)
+
+    async def broadcast_file_addition(self, file_metadata):
+        """
+        Broadcasts a message to all connected clients containing the metadata of the added file
+        """
+        # Broadcast the message to all connected clients
+        logging.debug(f"Broadcasting file addition! Metadata={file_metadata}")
+        await self.broadcast("file_addition", file_metadata=file_metadata)
+
     async def broadcast_new_user(self, node_id, node_ip):
         """
-
+        Broadcasts message to all connected clients containing node id and ip of the newly joined node.
         :param node_id:
         :param node_ip: tuple (ip, socket port)
         :return:
@@ -260,10 +325,14 @@ class Node:
             logger.debug("Received an ack from node that we didn't broadcast to. Ignoring...")
         logger.debug(f"Current status of active nodes: {self.active_nodes}")
 
-    def store_file(self, file_name, file_data):
-        # Implement file storage functionality
-        pass
+    async def download_file(self, file_metadata, dest_ip):
+        file_owner = file_metadata['file_owner']
+        file_name = file_metadata['file_name']
 
-    def find_file(self, file_name):
-        # Implement file retrieval functionality
-        pass
+        file_path = os.path.join(TRACKED_FOLDER_PATH, file_name)
+
+        try:
+            await self.communication.send_file(dest_ip, file_path)
+            print(f"File '{file_name}' sent successfully from {file_owner}")
+        except Exception as e:
+            print(f"Failed to download file '{file_name}' from {file_owner}: {e}")

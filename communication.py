@@ -1,8 +1,9 @@
 import logging
+import os
 import socket
 import pickle
 
-from globals import SOCKET_LISTENING_PORT
+from globals import SOCKET_LISTENING_PORT, FILE_TRANSFER_PORT, TRACKED_FOLDER_PATH
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger("communication")
@@ -85,6 +86,60 @@ class Communication:
         message = {"type": "broadcast_ack", "node_id": node_id}
         logger.debug(f"Sending broadcast ack to ({dest_ip, SOCKET_LISTENING_PORT}: {message})")
         self.send_message(dest_ip, SOCKET_LISTENING_PORT, message)
+
+    def send_file_download_ack(self, dest_ip, file_metadata):
+        message = {"type": "file_download_ack", "file_metadata": file_metadata}
+        logger.debug(f"Sending file download ack to ({dest_ip, SOCKET_LISTENING_PORT}: {message})")
+        self.send_message(dest_ip, SOCKET_LISTENING_PORT, message)
+
+    def send_file(self, destination_ip, file_path):
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                # Create a socket object
+                # Connect to the destination IP and port
+                s.connect((destination_ip, FILE_TRANSFER_PORT))
+
+                # Get the file name from the file path
+                file_name = os.path.basename(file_path)
+
+                # Send the file name
+                s.send(file_name.encode())
+
+                # Open the file to be sent
+                with open(file_path, 'rb') as file:
+                    # Read data from the file in chunks and send it
+                    while True:
+                        data = file.read(1024)
+                        if not data:
+                            break
+                        s.send(data)
+
+                print(f"File '{file_name}' sent successfully.")
+
+        except Exception as e:
+            print(f"Error sending file: {e}")
+
+    def receive_file(self):
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.bind(("0.0.0.0", FILE_TRANSFER_PORT))
+                s.listen()
+                conn, addr = s.accept()
+                file_name = conn.recv(1024).decode()
+                file_path = os.path.join(TRACKED_FOLDER_PATH, file_name)  # Path to save at
+
+                with open(file_path, 'wb') as file:
+                    while True:
+                        # Receive data in chunks and write it to the file
+                        data = conn.recv(1024)
+                        if not data:
+                            break
+                        file.write(data)
+
+                print(f"File '{file_name}' received successfully and saved at '{file_path}'.")
+
+        except Exception as e:
+            print(f"Error receiving file: {e}")
 
     def get_local_ipv4(self):
         try:
