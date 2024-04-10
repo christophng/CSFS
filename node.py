@@ -6,7 +6,7 @@ import threading
 from kademlia.network import Server
 
 from communication import Communication
-from globals import LISTENING_PORT, SOCKET_LISTENING_PORT
+from globals import LISTENING_PORT, SOCKET_LISTENING_PORT, ACK_WAIT_TIMEOUT
 from session import Session
 
 logging.getLogger("kademlia").setLevel(logging.DEBUG)
@@ -39,6 +39,8 @@ class Node:
 
         self.provided_session_id = ""  # For when the node wants to join a session, store the provided session ID here
 
+        self.active_nodes = {}  # Dict to track active nodes. {nodeID:isActive}
+
         # Communication stuff
         self.communication = Communication()
         self.message_handlers = {
@@ -47,6 +49,7 @@ class Node:
             "replicate_dht_bootstrap": self.handle_replicate_dht_request,
             "replicate_dht_bootstrap_response": self.handle_replicate_dht_request_response,
             "new_user_notificataion": self.handle_broadcast_new_user,
+            "broadcast_ack": self.handle_broadcast_acks,
         }
         self.running = True
 
@@ -142,10 +145,12 @@ class Node:
         :return: Contents of its DHT
         """
         address = message.get("sender_address")[0]
+
+        print(f"Local session data before update session: {self.session.nodes}")
         await self.session.update_session_nodes()  # Load DHT data to local session data
         data = self.session.nodes
         node_id = self.node_id
-        print(f"Got data from bootstrapped node: {data}")
+        print(f"Local data from bootstrapped node after update session: {data}")
         self.communication.send_replicate_dht_request_response(address, data, node_id)
         # Logic will transfer over to handle_replicate_dht_request_response
 
@@ -182,8 +187,10 @@ class Node:
     async def handle_broadcast_new_user(self, message):
         node_ip = message.get("node_ip")
         node_id = message.get("node_id")
+        sender_address = message.get("sender_address")
         print(f"Got broadcast new node: adding new node: {node_id},{node_ip}")
         await self.session.add_session_node(node_id, node_ip)
+        self.communication.send_broadcast_ack(sender_address[0], self.node_id)
 
     def handle_verification_message(self, message):
         session_id = message.get("session_id")
@@ -204,16 +211,52 @@ class Node:
         await self.broadcast("new_user_notificataion", node_id=node_id, node_ip=node_ip)
 
     async def broadcast(self, topic, **kwargs):
-        # Get all nodes in the session/DHT
-        session_nodes = await self.session.get_session_nodes()
-        for node_id, node_ip in session_nodes.items():
-            # Skip broadcasting to self
-            if node_id != self.node_id:
-                # Construct message
-                message = {"type": topic, **kwargs}
-                # Send message to each node
-                # Node_ip is a tuple with (IP, port)
-                self.communication.send_message(node_ip[0], SOCKET_LISTENING_PORT, message)
+        try:
+            # Get all nodes in the session/DHT
+            session_nodes = await self.session.get_session_nodes()
+            # Track active nodes
+            # When sending acknowledgements to a broadcast, they should include the sender node's ID
+            # This way, we can track which ID has been sent, and which IDs have been sent back via a global array
+
+            for node_id, node_ip in session_nodes.items():
+                # Skip broadcasting to self
+                if node_id != self.node_id:
+                    # Construct message
+                    message = {"type": topic, **kwargs}
+                    # Send message to each node
+                    # Node_ip is a tuple with (IP, port)
+                    self.communication.send_message(node_ip[0], SOCKET_LISTENING_PORT, message)
+                    self.active_nodes[node_id] = False  # Initialize them as false. Only store when the message has
+                    # been sent.
+
+            # We pause broadcast for ACK_WAIT_TIMEOUT seconds. When the sleep is over, all nodes that haven't had
+            # their ACK been processed/handled yet are considered offline
+            print("Starting broadcast wait...")
+            await asyncio.sleep(ACK_WAIT_TIMEOUT)
+
+            # After sleep is over, lets check self.active_nodes to see which nodeIDs still have a False value
+            for node_id, is_acked in self.active_nodes.values():
+                print(f"Checking if acks are received. ID: {node_id} Acked: {is_acked}")
+                if not is_acked:
+                    print(f"Found offline node {node_id}. Removing...")
+                    self.session.remove_session_node(node_id)
+
+            # Reset active_nodes
+            self.active_nodes = {}
+
+        except Exception as e:
+            print(f"Error during broadcast and handling inactive nodes: {e}")
+
+    async def handle_broadcast_acks(self, message):
+        # Here we handle acknowledgements from each client we sent the broadcast to successfully
+        # Message should have nodeID (thats pretty much all we need to verify the ack)
+        node_id = message.get("node_id")
+        print(f"Received an ack from {node_id}")
+        if node_id in self.active_nodes.keys():
+            self.active_nodes[node_id] = True
+        else:
+            print("Received an ack from node that we didn't broadcast to. Ignoring...")
+        print(f"Current status of active nodes: {self.active_nodes}")
 
     def store_file(self, file_name, file_data):
         # Implement file storage functionality

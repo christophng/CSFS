@@ -72,6 +72,17 @@ class Communication:
         print(f"Sending Replicate-DHT request to ({dest_ip, SOCKET_LISTENING_PORT}: {message})")
         self.send_message(dest_ip, SOCKET_LISTENING_PORT, message)
 
+    def send_broadcast_ack(self, dest_ip, node_id):
+        """
+        We want to use this in every handle_broadcast_<broadcasttype> method to acknowledge after all logic is done
+        :param dest_ip:
+        :param node_id:
+        :return:
+        """
+        message = {"type": "broadcast_ack", "node_id": node_id}
+        print(f"Sending broadcast ack to ({dest_ip, SOCKET_LISTENING_PORT}: {message})")
+        self.send_message(dest_ip, SOCKET_LISTENING_PORT, message)
+
     def get_local_ipv4(self):
         try:
             # Get the IPv4 address associated with the local machine
