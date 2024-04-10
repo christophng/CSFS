@@ -164,8 +164,8 @@ class Node:
         print(f"Got DHT request response: {data}")
 
         # Insert data into own DHT
-        for node_id, node_ip in data.items():
-            await self.session.add_session_node(node_id, node_ip)
+        for data_id, data_ip in data.items():
+            await self.session.add_session_node(data_id, data_ip)
 
         # Now we want to add the bootstrapped node to our DHT
         await self.session.add_session_node(node_id, (address, SOCKET_LISTENING_PORT))
