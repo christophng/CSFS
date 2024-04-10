@@ -15,7 +15,6 @@ logger = logging.getLogger("node")
 # logging.getLogger("kademlia").setLevel(logging.DEBUG)
 
 
-
 def bytes_to_hex_string(byte_string):
     return byte_string.hex()
 
