@@ -99,6 +99,7 @@ class Node:
             verified = message.get("verified")
             if verified:
                 bootstrap_node = (sender_ip, LISTENING_PORT)
+                print(f"Sending bootstrap request to {bootstrap_node}")
                 await self.server.bootstrap([bootstrap_node])
                 self.session.set_session_id(self.provided_session_id)
                 print(f"Joined session: {self.session.get_session_id()}")
