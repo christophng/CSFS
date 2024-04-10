@@ -58,6 +58,20 @@ class Communication:
         print(f"Sending response to join request to ({ip, port}): {message}")
         self.send_message(ip, port, message)
 
+    def send_replicate_dht_request(self, bootstrapped_node_ip):
+        # Send a request to the bootstrapped node to retrieve its DHT data
+
+        message = {"type": "replicate_dht_bootstrap"}
+        print(f"Sending Replicate-DHT request to ({bootstrapped_node_ip, SOCKET_LISTENING_PORT}: {message})")
+        self.send_message(bootstrapped_node_ip, SOCKET_LISTENING_PORT, message)
+
+    def send_replicate_dht_request_response(self, dest_ip, data, node_id):
+        # Send a response to the replicate dht request with the bootstrapped node's DHT data
+
+        message = {"type": "replicate_dht_bootstrap_response", "node_id": node_id, "data": data}
+        print(f"Sending Replicate-DHT request to ({dest_ip, SOCKET_LISTENING_PORT}: {message})")
+        self.send_message(dest_ip, SOCKET_LISTENING_PORT, message)
+
     def get_local_ipv4(self):
         try:
             # Get the IPv4 address associated with the local machine

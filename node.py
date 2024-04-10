@@ -31,8 +31,8 @@ class Node:
         print("Node initializing...")
         self.node_id = node_id
         self.server = None
+        self.session = None
 
-        self.session = Session()
         self.provided_session_id = ""  # For when the node wants to join a session, store the provided session ID here
 
         # Communication stuff
@@ -40,6 +40,9 @@ class Node:
         self.message_handlers = {
             "join_request": self.handle_verification_message,
             "join_request_response": self.handle_verification_response_message,
+            "replicate_dht_bootstrap": self.handle_replicate_dht_request,
+            "replicate_dht_bootstrap_response": self.handle_replicate_dht_request_response,
+            "new_user_notificataion": self.handle_broadcast_new_user,
         }
         self.running = True
 
@@ -57,6 +60,8 @@ class Node:
     async def initialize(self):
         self.server = await init_server()
         print("Kademlia server successfully initialized!")
+        self.session = Session(self.server)  # Initialize session after server
+        # Since session needs server in its constructor
 
     async def bootstrap(self, bootstrap_node):
         await self.server.bootstrap([bootstrap_node])
@@ -94,6 +99,16 @@ class Node:
             raise
 
     async def handle_verification_response_message(self, message):
+        """
+        Pretty much what to do after we get the verification response back.
+        We should
+        1. Bootstrap to add ourselves to the network
+        2. Replicate our DHT with the bootstrapped node
+        3. Add the bootstrapped node to our DHT
+        4. Broadcast to all nodes in the updated DHT our join
+        :param message:
+        :return:
+        """
         if message and message.get("verified"):
             sender_ip = message.get("sender_address")[0]
             verified = message.get("verified")
@@ -105,9 +120,62 @@ class Node:
                 print(f"Joined session: {self.session.get_session_id()}")
 
                 # Do rest of join session logic on the node who's joining's side
+                # REPLICATE DHT
+
+                self.communication.send_replicate_dht_request(sender_ip)  # Send a request to replicate the DHT.
+                # Logic will transfer over to handle_replicate_dht_request
+
             else:
                 print("Session ID verification failed. The Session ID could be incorrect or the node you are "
                       "attempting to contact is not connected to a session.")
+
+    async def handle_replicate_dht_request(self, message):
+        """
+        Handle the replicate DHT request (bootstrapped node runs this)
+        :param message:
+        :return: Contents of its DHT
+        """
+        address = message.get("sender_address")[0]
+        await self.session.update_session_nodes()  # Load DHT data to local session data
+        data = self.session.nodes
+        node_id = self.server.node_id
+        print(f"Got data from bootstrapped node: {data}")
+        self.communication.send_replicate_dht_request_response(address, data, node_id)
+        # Logic will transfer over to handle_replicate_dht_request_response
+
+    async def handle_replicate_dht_request_response(self, message):
+        """
+        Handle the response from the DHT request
+        Take data and put into own DHT
+        Add sender information to own DHT
+        Broadcast add own data to all connected clients
+        :param message:
+        :return:
+        """
+        data = message.get("data")  # Bootstrap node DHT data
+        address = message.get("sender_address")[0]  # Address of sender (bootstrap node)
+        node_id = message.get("node_id")  # Node id of bootstrap node
+        print(f"Got DHT request response: {data}")
+
+        # Insert data into own DHT
+        for node_id, node_ip in data:
+            await self.session.add_session_node(node_id, node_ip)
+
+        # Now we want to add the bootstrapped node to our DHT
+        await self.session.add_session_node(node_id, (address, SOCKET_LISTENING_PORT))
+
+        # Now broadcast the join to all connected clients
+        join_node_id = self.server.node_id
+        join_node_ip = self.communication.get_local_ipv4()
+        await self.broadcast_new_user(join_node_id, (join_node_ip, SOCKET_LISTENING_PORT))
+
+        # Logic will transfer over to handle_broadcast_new_user
+
+    def handle_broadcast_new_user(self, message):
+        node_ip = message.get("node_ip")
+        node_id = message.get("node_id")
+        print(f"Got broadcast new node: adding new node: {node_id},{node_ip}")
+        self.session.add_session_node(node_id, node_ip)
 
     def handle_verification_message(self, message):
         session_id = message.get("session_id")
@@ -117,6 +185,26 @@ class Node:
             self.communication.send_verification_response(address[0], address[1], True)
         else:
             self.communication.send_verification_response(address[0], address[1], False)
+
+    async def broadcast_new_user(self, node_id, node_ip):
+        """
+
+        :param node_id:
+        :param node_ip: tuple (ip, socket port)
+        :return:
+        """
+        await self.broadcast("new_user_notificataion", node_id=node_id, node_ip=node_ip)
+
+    async def broadcast(self, topic, **kwargs):
+        # Get all nodes in the session/DHT
+        session_nodes = await self.session.get_session_nodes()
+        for node_id, node_ip in session_nodes.items():
+            # Skip broadcasting to self
+            if node_id != self.node_id:
+                # Construct message
+                message = {"type": topic, **kwargs}
+                # Send message to each node
+                self.communication.send_message(node_ip, SOCKET_LISTENING_PORT, message)
 
     def store_file(self, file_name, file_data):
         # Implement file storage functionality
