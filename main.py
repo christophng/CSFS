@@ -25,8 +25,8 @@ async def main():
             session_id = input("Enter session ID: ").strip()
             bootstrap_node = (BOOTSTRAP_NODE_IP, LISTENING_PORT)  # Assuming bootstrap node is localhost
             await node.join_session(session_id, bootstrap_node)
-            session = Session()  # Creating a new session instance
-            print("Joined session", session_id)
+            # session = Session()  # Creating a new session instance
+            # print("Joined session", session_id)
 
         elif command == "exit":
             break

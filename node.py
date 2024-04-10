@@ -97,12 +97,14 @@ class Node:
             if verified:
                 bootstrap_node = (sender_ip, LISTENING_PORT)
                 await self.server.bootstrap([bootstrap_node])
+                print("Joined session!")
             else:
                 print("Session ID verification failed.")
 
     def handle_verification_message(self, message):
         session_id = message.get("session_id")
         address = message.get("sender_address")
+        print(f"Actual session ID: {self.session_id}, Provided session ID: {session_id}")
         if session_id == self.session_id:
             self.communication.send_verification_response(address[0], address[1], True)
         else:
