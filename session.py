@@ -14,6 +14,7 @@ class Session:
         self.nodes[node_id] = node_ip
         print(f"Adding node to session: {node_id}, {node_ip}")
         await self.store_session_nodes()
+        print(f"Nodes now stored: {self.nodes}")
 
     async def remove_session_node(self, node_id):
         # Remove a node from the session nodes in the DHT
