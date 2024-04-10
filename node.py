@@ -27,9 +27,9 @@ async def init_server():
 
 
 class Node:
-    def __init__(self, node_id):
+    def __init__(self):
         print("Node initializing...")
-        self.node_id = node_id
+        self.node_id = None
         self.server = None
         self.session = None
 
@@ -62,6 +62,7 @@ class Node:
         print("Kademlia server successfully initialized!")
         self.session = Session(self.server)  # Initialize session after server
         # Since session needs server in its constructor
+        self.node_id = self.server.node.id
 
     async def bootstrap(self, bootstrap_node):
         await self.server.bootstrap([bootstrap_node])
@@ -138,7 +139,7 @@ class Node:
         address = message.get("sender_address")[0]
         await self.session.update_session_nodes()  # Load DHT data to local session data
         data = self.session.nodes
-        node_id = self.server.node_id
+        node_id = self.node_id
         print(f"Got data from bootstrapped node: {data}")
         self.communication.send_replicate_dht_request_response(address, data, node_id)
         # Logic will transfer over to handle_replicate_dht_request_response
@@ -165,7 +166,7 @@ class Node:
         await self.session.add_session_node(node_id, (address, SOCKET_LISTENING_PORT))
 
         # Now broadcast the join to all connected clients
-        join_node_id = self.server.node_id
+        join_node_id = self.node_id
         join_node_ip = self.communication.get_local_ipv4()
         await self.broadcast_new_user(join_node_id, (join_node_ip, SOCKET_LISTENING_PORT))
 

@@ -6,7 +6,7 @@ from globals import BOOTSTRAP_NODE_IP, LISTENING_PORT
 
 
 async def main():
-    node = Node("node_id")
+    node = Node()
     await node.initialize()
 
     while True:
