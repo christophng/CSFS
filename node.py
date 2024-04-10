@@ -59,7 +59,7 @@ class Node:
         print("Kademlia server successfully initialized!")
 
     async def bootstrap(self, bootstrap_node):
-        self.server.bootstrap([bootstrap_node])
+        await self.server.bootstrap([bootstrap_node])
 
     async def listen_for_messages(self):
         print(f"Socket listening for messages on port {SOCKET_LISTENING_PORT}...")

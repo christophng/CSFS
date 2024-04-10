@@ -1,7 +1,6 @@
 import asyncio
-
+import aioconsole
 from node import Node
-from session import Session
 
 from globals import BOOTSTRAP_NODE_IP, LISTENING_PORT
 
@@ -11,7 +10,7 @@ async def main():
     await node.initialize()
 
     while True:
-        command = input("Enter command (create/join/exit): ").strip()
+        command = await aioconsole.ainput("Enter command (create/join/exit): ")
 
         if command == "create":
             if node.session.session_id is not None:
@@ -24,8 +23,6 @@ async def main():
             session_id = input("Enter session ID: ").strip()
             bootstrap_node = (BOOTSTRAP_NODE_IP, LISTENING_PORT)  # Assuming bootstrap node is localhost
             await node.join_session(session_id, bootstrap_node)
-            # session = Session()  # Creating a new session instance
-            # print("Joined session", session_id)
 
         elif command == "exit":
             break
