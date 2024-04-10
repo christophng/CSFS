@@ -7,19 +7,18 @@ from globals import BOOTSTRAP_NODE_IP, LISTENING_PORT
 
 
 async def main():
-    node = Node("node_id", None)
+    node = Node("node_id")
     await node.initialize()
-    session = None
 
     while True:
         command = input("Enter command (create/join/exit): ").strip()
 
         if command == "create":
-            if session is not None:
+            if node.session.session_id is not None:
                 print("You are already in a session.")
                 continue
-            session = Session()
-            print("Session created. Session ID:", session.get_session_id())
+            node.session.generate_session_id()
+            print("Session created. Session ID:", node.session.get_session_id())
 
         elif command == "join":
             session_id = input("Enter session ID: ").strip()

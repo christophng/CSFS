@@ -6,6 +6,7 @@ from kademlia.network import Server
 
 from communication import Communication
 from globals import LISTENING_PORT, SOCKET_LISTENING_PORT
+from session import Session
 
 
 async def init_server():
@@ -22,11 +23,13 @@ async def init_server():
 
 
 class Node:
-    def __init__(self, node_id, session_id):
+    def __init__(self, node_id):
         print("Node initializing...")
         self.node_id = node_id
-        self.session_id = session_id
         self.server = None
+
+        self.session = Session()
+        self.provided_session_id = ""  # For when the node wants to join a session, store the provided session ID here
 
         # Communication stuff
         self.communication = Communication()
@@ -73,7 +76,7 @@ class Node:
 
             print(f"Trying to join session {session_id} via bootstrap node {bootstrap_node}...")
 
-            self.session_id = session_id
+            self.provided_session_id = session_id
 
             # Send verification request msg first
             self.communication.send_join_request_message(bootstrap_node[0], SOCKET_LISTENING_PORT, session_id)
@@ -97,15 +100,19 @@ class Node:
             if verified:
                 bootstrap_node = (sender_ip, LISTENING_PORT)
                 await self.server.bootstrap([bootstrap_node])
-                print("Joined session!")
+                self.session.set_session_id(self.provided_session_id)
+                print(f"Joined session: {self.session.get_session_id()}")
+
+                # Do rest of join session logic on the node who's joining's side
             else:
-                print("Session ID verification failed.")
+                print("Session ID verification failed. The Session ID could be incorrect or the node you are "
+                      "attempting to contact is not connected to a session.")
 
     def handle_verification_message(self, message):
         session_id = message.get("session_id")
         address = message.get("sender_address")
-        print(f"Actual session ID: {self.session_id}, Provided session ID: {session_id}")
-        if session_id == self.session_id:
+        print(f"Actual session ID: {self.session.get_session_id()}, Provided session ID: {session_id}")
+        if session_id == self.session.get_session_id():
             self.communication.send_verification_response(address[0], address[1], True)
         else:
             self.communication.send_verification_response(address[0], address[1], False)
