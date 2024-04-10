@@ -87,14 +87,7 @@ class Node:
 
             # Send verification request msg first
             self.communication.send_join_request_message(bootstrap_node[0], SOCKET_LISTENING_PORT, session_id)
-            # Get verification request response
-            # response = self.communication.receive_verification_response(LISTENING_PORT)
-            # if response and response.get("verified"):
-            #     print(f"Performing bootstrapping for node {bootstrap_node}")
-            #     await self.server.bootstrap([bootstrap_node])
-            #     print(f"Bootstrapping successful.")
-            # else:
-            #     print("Session ID verification failed.")
+            # The response will be intercepted by the listener, and will be handled
 
         except Exception as e:
             print("Error joining session:", e)
@@ -107,7 +100,7 @@ class Node:
             if verified:
                 bootstrap_node = (sender_ip, LISTENING_PORT)
                 print(f"Sending bootstrap request to {bootstrap_node}")
-                await self.bootstrap([bootstrap_node])
+                await self.bootstrap(bootstrap_node)
                 self.session.set_session_id(self.provided_session_id)
                 print(f"Joined session: {self.session.get_session_id()}")
 
