@@ -13,6 +13,10 @@ logging.getLogger("kademlia").setLevel(logging.DEBUG)
 logging.basicConfig(level=logging.DEBUG)
 
 
+def bytes_to_hex_string(byte_string):
+    return byte_string.hex()
+
+
 async def init_server():
     try:
         server = Server()
@@ -62,7 +66,8 @@ class Node:
         print("Kademlia server successfully initialized!")
         self.session = Session(self.server)  # Initialize session after server
         # Since session needs server in its constructor
-        self.node_id = self.server.node.id
+        self.node_id = bytes_to_hex_string(self.server.node.id)
+        print(f"Assigned node ID: {self.node_id}")
 
     async def bootstrap(self, bootstrap_node):
         await self.server.bootstrap([bootstrap_node])
