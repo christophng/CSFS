@@ -33,6 +33,9 @@ class Session:
     def set_session_id(self, session_id):
         self.session_id = session_id
 
+    def get_session_id(self):
+        return self.session_id
+
     async def update_session_nodes(self):
         # Retrieve the session nodes from the DHT and update the local nodes dictionary
         key = f"session_nodes:{self.session_id}"
