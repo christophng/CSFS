@@ -109,10 +109,10 @@ class Communication:
                 with open(file_path, 'rb') as file:
                     # Read data from the file in chunks and send it
                     while True:
-                        data = file.read(1024)
+                        data = file.read(4096)
                         if not data:
                             break
-                        s.send(data)
+                        s.sendall(data)
 
                 print(f"File '{file_name}' sent successfully.")
 
@@ -125,7 +125,7 @@ class Communication:
                 s.bind(("0.0.0.0", FILE_TRANSFER_PORT))
                 s.listen()
                 conn, addr = s.accept()
-                file_name = conn.recv(1024).decode()
+                file_name = conn.recv(4096).decode()
                 file_path = os.path.join(TRACKED_FOLDER_PATH, file_name)  # Path to save at
 
                 # Check if the file already exists in the destination folder
