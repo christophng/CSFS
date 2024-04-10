@@ -50,11 +50,11 @@ class Session:
         return self.nodes
 
     async def update_session_nodes(self):
-        # Retrieve the session nodes from the DHT and update the local nodes dictionary
-        key = f"session_nodes:{self.session_id}"
-        value_bytes = await self.server.get(key.encode())
-        if value_bytes:
-            self.nodes = pickle.loads(value_bytes)
+        # # Retrieve the session nodes from the DHT and update the local nodes dictionary
+        # key = f"session_nodes:{self.session_id}"
+        # value_bytes = await self.server.get(key.encode())
+        # if value_bytes:
+        #     self.nodes = pickle.loads(value_bytes)
         logger.debug(f"Updated session nodes. New local session data: {self.nodes}")
 
     async def add_file_metadata(self, file_metadata):

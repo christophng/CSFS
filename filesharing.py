@@ -48,7 +48,7 @@ class FileSharing:
         """
         Updates the Kademlia DHT with the metadata of the added file
         """
-        self.node.session.add_file_metadata(file_metadata)
+        await self.node.session.add_file_metadata(file_metadata)
 
 
 class FileEventHandler(FileSystemEventHandler):
