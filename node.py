@@ -292,27 +292,27 @@ class Node:
                     message = {"type": topic, **kwargs}
                     # Send message to each node
                     # Node_ip is a tuple with (IP, port)
-                    self.communication.send_message(node_ip[0], SOCKET_LISTENING_PORT, message)
                     self.active_nodes[node_id] = False  # Initialize them as false. Only store when the message has
-                    logger.debug("Starting broadcast wait...")
-                    await asyncio.sleep(ACK_WAIT_TIMEOUT)
+                    self.communication.send_message(node_ip[0], SOCKET_LISTENING_PORT, message)
+                    # logger.debug("Starting broadcast wait...")
+                    # await asyncio.sleep(ACK_WAIT_TIMEOUT)
                     # been sent.
 
             # We pause broadcast for ACK_WAIT_TIMEOUT seconds. When the sleep is over, all nodes that haven't had
             # their ACK been processed/handled yet are considered offline
 
             # After sleep is over, lets check self.active_nodes to see which nodeIDs still have a False value
-            for node_id, is_acked in self.active_nodes.items():
-                logger.debug(f"Checking if acks are received. ID: {node_id} Acked: {is_acked}")
-                if not is_acked:
-                    logger.debug(f"Found offline node {node_id}. Removing...")
-                    await self.session.remove_session_node(node_id)
+            # for node_id, is_acked in self.active_nodes.items():
+            #     logger.debug(f"Checking if acks are received. ID: {node_id} Acked: {is_acked}")
+            #     if not is_acked:
+            #         logger.debug(f"Found offline node {node_id}. Removing...")
+            #         await self.session.remove_session_node(node_id)
 
             # Reset active_nodes
-            self.active_nodes = {}
+            # self.active_nodes = {}
 
         except Exception as e:
-            logger.debug(f"Error during broadcast and handling inactive nodes: {e}")
+            logger.debug(f"Error during broadcast: {e}")
 
     async def handle_broadcast_acks(self, message):
         # Here we handle acknowledgements from each client we sent the broadcast to successfully
