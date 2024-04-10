@@ -128,6 +128,11 @@ class Communication:
                 file_name = conn.recv(1024).decode()
                 file_path = os.path.join(TRACKED_FOLDER_PATH, file_name)  # Path to save at
 
+                # Check if the file already exists in the destination folder
+                if os.path.exists(file_path):
+                    print(f"File '{file_name}' already exists in the destination folder. Skipping download.")
+                    return
+
                 with open(file_path, 'wb') as file:
                     while True:
                         # Receive data in chunks and write it to the file
