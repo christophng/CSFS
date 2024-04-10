@@ -55,6 +55,7 @@ class Node:
             "new_user_notificataion": self.handle_broadcast_new_user,
             "broadcast_ack": self.handle_broadcast_acks,
             "file_addition": self.handle_file_addition_message,
+            "file_download_ack": self.handle_file_addition_ack,
         }
         self.running = True
 
